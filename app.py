@@ -2,15 +2,13 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
-
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
-from langchain_community.chat_models import ChatOllama  # local (Ollama)
-
+from langchain_community.chat_models import ChatOllama  
 from htmlTemplates import css, user_template, bot_template
 from tts import tts_to_wav_bytes
 
@@ -25,7 +23,6 @@ QA_PROMPT = PromptTemplate(
     input_variables=["context", "question"],
 )
 
-
 # -------------------- PDF utils --------------------
 def get_pdf_text(pdf_docs):
     text = ""
@@ -37,7 +34,6 @@ def get_pdf_text(pdf_docs):
                 text += content
     return text
 
-
 def get_text_chunks(text):
     splitter = CharacterTextSplitter(
         separator="\n",
@@ -47,19 +43,21 @@ def get_text_chunks(text):
     )
     return splitter.split_text(text)
 
-
 def get_vectorstore(text_chunks):
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
     return FAISS.from_texts(texts=text_chunks, embedding=embeddings)
 
-
 # -------------------- Local LLM via Ollama --------------------
 def build_local_llm():
-    # If slow, try model="llama3" or "mistral".
-    return ChatOllama(model="llama3:8b", temperature=0.05, num_ctx=4096)
-
+    base_url = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+    return ChatOllama(
+        model="llama3:8b",
+        temperature=0.05,
+        num_ctx=4096,
+        base_url=base_url,  
+    )
 
 def get_conversation_chain(vectorstore):
     llm = build_local_llm()
@@ -72,7 +70,6 @@ def get_conversation_chain(vectorstore):
         combine_docs_chain_kwargs={"prompt": QA_PROMPT},
         return_source_documents=False,
     )
-
 
 # -------------------- Clean answer (≤25 words, one sentence) --------------------
 def clean_answer(raw: str) -> str:
@@ -88,7 +85,6 @@ def clean_answer(raw: str) -> str:
     words = raw.split()
     return (" ".join(words[:25]) + ("..." if len(words) > 25 else "")).strip()
 
-
 # -------------------- Streamlit App --------------------
 def main():
     load_dotenv()
@@ -96,9 +92,7 @@ def main():
 
     # Load your CSS for avatars/bubbles
     st.markdown(css, unsafe_allow_html=True)
-
     st.title("📚 Chat with Multiple PDFs")
-
     # Sidebar: upload & process PDFs
     with st.sidebar:
         st.subheader("Upload your documents")
@@ -145,7 +139,6 @@ def main():
             answer = clean_answer(
                 resp.get("answer", "The answer is not available in the documents.")
             )
-
         # Show bot bubble
         st.session_state.messages.append({"role": "bot", "content": answer})
         st.markdown(bot_template.replace("{{MSG}}", answer), unsafe_allow_html=True)
@@ -163,7 +156,6 @@ def main():
             )
         except Exception as e:
             st.info(f"Audio unavailable: {e}")
-
 
 if __name__ == "__main__":
     main()

@@ -1,18 +1,21 @@
+# Core app
 streamlit
-langchain
-langchain-community
-faiss-cpu
-transformers
-accelerate
-sentence-transformers
 python-dotenv
 PyPDF2
-transformers>=4.40
-soundfile
+langchain>=0.2
+langchain-community>=0.2
+sentence-transformers
+faiss-cpu
 numpy
-torch      
-soundfile
+torch              # CPU build; use CUDA build if you enable GPU
 
-   # CPU is fine; use the GPU build if you have CUDA
-# Parler-TTS: install from GitHub (pip supports this syntax)
+# HF stack
+transformers>=4.41
+accelerate
+huggingface-hub
+sentencepiece
+
+# Audio / TTS
+soundfile
+# Install Parler-TTS from GitHub (requires git + git-lfs in Docker image)
 parler-tts @ git+https://github.com/huggingface/parler-tts.git

@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: multi-pdf-chat
+    ports:
+      - "8501:8501"
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - HF_HOME=/app/.cache/huggingface
+    volumes:
+      - ./media:/app/media
+      - ./output:/app/output
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
