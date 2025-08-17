@@ -9,9 +9,10 @@ from langchain_community.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
-from langchain_community.chat_models import ChatOllama  # local, free (Ollama)
+from langchain_community.chat_models import ChatOllama  # local (Ollama)
 
 from htmlTemplates import css, user_template, bot_template
+from tts import tts_to_wav_bytes
 
 
 # -------------------- Prompt (one short sentence) --------------------
@@ -31,27 +32,32 @@ def get_pdf_text(pdf_docs):
     for pdf in pdf_docs:
         reader = PdfReader(pdf)
         for page in reader.pages:
-            c = page.extract_text()
-            if c:
-                text += c
+            content = page.extract_text()
+            if content:
+                text += content
     return text
 
 
 def get_text_chunks(text):
     splitter = CharacterTextSplitter(
-        separator="\n", chunk_size=1000, chunk_overlap=200, length_function=len
+        separator="\n",
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len,
     )
     return splitter.split_text(text)
 
 
 def get_vectorstore(text_chunks):
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
     return FAISS.from_texts(texts=text_chunks, embedding=embeddings)
 
 
 # -------------------- Local LLM via Ollama --------------------
 def build_local_llm():
-    # You pulled llama3:8b already. If slow, try "llama3" or "mistral".
+    # If slow, try model="llama3" or "mistral".
     return ChatOllama(model="llama3:8b", temperature=0.05, num_ctx=4096)
 
 
@@ -69,11 +75,14 @@ def get_conversation_chain(vectorstore):
 
 
 # -------------------- Clean answer (≤25 words, one sentence) --------------------
-def clean_answer(raw):
+def clean_answer(raw: str) -> str:
+    if not raw:
+        return "The answer is not available in the documents."
     # Remove any prompt echo before "Answer:"
     if "Answer:" in raw:
         raw = raw.split("Answer:")[-1].strip()
     raw = raw.strip()
+    # Keep only the first sentence
     if "." in raw:
         raw = raw.split(".")[0] + "."
     words = raw.split()
@@ -93,7 +102,9 @@ def main():
     # Sidebar: upload & process PDFs
     with st.sidebar:
         st.subheader("Upload your documents")
-        pdf_docs = st.file_uploader("Choose PDFs", accept_multiple_files=True, type=["pdf"])
+        pdf_docs = st.file_uploader(
+            "Choose PDFs", accept_multiple_files=True, type=["pdf"]
+        )
         if st.button("Process"):
             if not pdf_docs:
                 st.warning("Please upload at least one PDF.")
@@ -112,31 +123,46 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Render chat history using your HTML templates (with avatars)
+    # Render chat history
     for msg in st.session_state.messages:
-        if msg["role"] == "user":
-            st.markdown(user_template.replace("{{MSG}}", msg["content"]), unsafe_allow_html=True)
-        else:
-            st.markdown(bot_template.replace("{{MSG}}", msg["content"]), unsafe_allow_html=True)
+        template = user_template if msg["role"] == "user" else bot_template
+        st.markdown(template.replace("{{MSG}}", msg["content"]), unsafe_allow_html=True)
 
-    # Chat input (stays open for next question)
+    # Chat input
     prompt = st.chat_input("Ask something about your documents…")
     if prompt:
         if st.session_state.conversation is None:
             st.warning("Please upload and process PDFs first.")
-        else:
-            # Show user bubble
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            st.markdown(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
+            return
 
-            # Get model answer
-            with st.spinner("Thinking…"):
-                resp = st.session_state.conversation.invoke({"question": prompt})
-                answer = clean_answer(resp.get("answer", "The answer is not available in the documents."))
+        # Show user bubble
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.markdown(user_template.replace("{{MSG}}", prompt), unsafe_allow_html=True)
 
-            # Show bot bubble
-            st.session_state.messages.append({"role": "bot", "content": answer})
-            st.markdown(bot_template.replace("{{MSG}}", answer), unsafe_allow_html=True)
+        # Get model answer
+        with st.spinner("Thinking…"):
+            resp = st.session_state.conversation.invoke({"question": prompt})
+            answer = clean_answer(
+                resp.get("answer", "The answer is not available in the documents.")
+            )
+
+        # Show bot bubble
+        st.session_state.messages.append({"role": "bot", "content": answer})
+        st.markdown(bot_template.replace("{{MSG}}", answer), unsafe_allow_html=True)
+
+        # --- Text-to-Speech: player & download ---
+        try:
+            wav_bytes = tts_to_wav_bytes(answer)
+            st.audio(wav_bytes, format="audio/wav")
+            st.download_button(
+                "⬇️ Download audio",
+                data=wav_bytes,
+                file_name="answer.wav",
+                mime="audio/wav",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.info(f"Audio unavailable: {e}")
 
 
 if __name__ == "__main__":

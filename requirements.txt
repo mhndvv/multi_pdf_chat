@@ -1,8 +1,18 @@
 streamlit
 langchain
+langchain-community
 faiss-cpu
 transformers
 accelerate
 sentence-transformers
 python-dotenv
 PyPDF2
+transformers>=4.40
+soundfile
+numpy
+torch      
+soundfile
+
+   # CPU is fine; use the GPU build if you have CUDA
+# Parler-TTS: install from GitHub (pip supports this syntax)
+parler-tts @ git+https://github.com/huggingface/parler-tts.git
