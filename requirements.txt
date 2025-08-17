@@ -1,0 +1,8 @@
+streamlit
+langchain
+faiss-cpu
+transformers
+accelerate
+sentence-transformers
+python-dotenv
+PyPDF2
