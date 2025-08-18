@@ -139,14 +139,18 @@ def build_local_llm():
     EnvironmentError
         If the model cannot connect to the specified base URL.
     """
-    base_url = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-    return ChatOllama(
+    base_url = (
+         os.getenv("OLLAMA_BASE_URL")
+         or os.getenv("OLLAMA_HOST")
+         or "http://ollama:11434"   # <— default to service name on Docker network
+    )
+
+    llm = ChatOllama(
         model="llama3:8b",
         temperature=0.05,
         num_ctx=4096,
-        base_url=base_url,  
+        base_url=base_url,
     )
-
 
 def get_conversation_chain(vectorstore):
     """

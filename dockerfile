@@ -1,36 +1,33 @@
-FROM python:3.11-slim
+FROM python:3.9-slim
 
-# System dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg git git-lfs libsndfile1 tini && \
-    rm -rf /var/lib/apt/lists/* && \
-    git lfs install
-
-WORKDIR /app
-
-# Avoid pip cache
-ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Install Python deps
-COPY requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip && \
-    pip install -r /app/requirements.txt
-
-# Copy project files
-COPY . /app
-
-# Folders your app writes to
-RUN mkdir -p /app/media /app/output
-
-# Streamlit defaults
-ENV STREAMLIT_SERVER_PORT=8501 \
+ENV PYTHONUNBUFFERED=1 \
+    UV_SYSTEM_PYTHON=1 \
+    PIP_NO_CACHE_DIR=1 \
+    GIT_LFS_SKIP_SMUDGE=1 \
+    STREAMLIT_SERVER_PORT=8501 \
     STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
     HF_HOME=/app/.cache/huggingface
 
-# Talk to Ollama on host
-ENV OLLAMA_HOST=http://host.docker.internal:11434
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ffmpeg git git-lfs libsndfile1 tini \
+    && git lfs install --skip-smudge \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Fast installer
+RUN pip install -U uv
+
+# Install deps first (good layer caching)
+COPY pyproject.toml uv.lock ./
+RUN uv pip install --system --no-cache .
+
+# Copy app code
+COPY . .
+RUN mkdir -p /app/media /app/output
 
 EXPOSE 8501
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
