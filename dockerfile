@@ -20,14 +20,14 @@ WORKDIR /app
 # Fast installer
 RUN pip install -U uv
 
-# Install deps first (good layer caching)
+# Install deps first (better cache)
 COPY pyproject.toml uv.lock ./
 RUN uv pip install --system --no-cache .
 
-# Copy app code
+# Copy app
 COPY . .
 RUN mkdir -p /app/media /app/output
 
 EXPOSE 8501
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+ENTRYPOINT ["/usr/bin/tini","--"]
+CMD ["streamlit","run","app.py","--server.address=0.0.0.0","--server.port=8501"]

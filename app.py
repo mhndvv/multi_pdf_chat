@@ -2,6 +2,7 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
+import requests   
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -120,30 +121,47 @@ def get_vectorstore(text_chunks):
     return FAISS.from_texts(texts=text_chunks, embedding=embeddings)
 
 # -------------------- Local LLM via Ollama --------------------
-def build_local_llm():
-    """
-    Build and return a local ChatOllama language model.
+try:
+    from langchain_ollama import ChatOllama
+except Exception:
+    from langchain_community.chat_models import ChatOllama
 
-    This function creates a ChatOllama client using the Llama3 model
-    with predefined parameters. It uses the environment variable
-    `OLLAMA_HOST` to set the base URL, or defaults to
-    "http://host.docker.internal:11434" if not found.
+def build_local_llm() -> "ChatOllama":
+    """
+    Build and health-check a local Ollama chat model client.
+
+    The function resolves the Ollama base URL from environment variables and
+    verifies connectivity by calling ``/api/tags``. On success it returns a
+    configured ``ChatOllama`` client for the model ``llama3:8b``.
+
+    Parameters
+    ----------
+    None
 
     Returns
     -------
     ChatOllama
-        A ChatOllama client configured with the Llama3 model.
+        An initialized LangChain Ollama chat model client.
 
     Raises
     ------
-    EnvironmentError
-        If the model cannot connect to the specified base URL.
+    RuntimeError
+        If Ollama is unreachable at the resolved base URL or if client
+        construction returns ``None``.
     """
     base_url = (
-         os.getenv("OLLAMA_BASE_URL")
-         or os.getenv("OLLAMA_HOST")
-         or "http://ollama:11434"   # <— default to service name on Docker network
-    )
+        os.getenv("OLLAMA_BASE_URL")
+        or os.getenv("OLLAMA_HOST")
+        or "http://ollama:11434"
+    ).rstrip("/")
+
+    # Show what URL we're using and verify connectivity
+    st.write(f"🛰️ OLLAMA URL = {base_url}")
+    try:
+        r = requests.get(f"{base_url}/api/tags", timeout=5)
+        r.raise_for_status()
+    except Exception as e:
+        raise RuntimeError(f"Cannot reach Ollama at {base_url}. Details: {e}")
 
     llm = ChatOllama(
         model="llama3:8b",
@@ -151,6 +169,9 @@ def build_local_llm():
         num_ctx=4096,
         base_url=base_url,
     )
+    if llm is None:
+        raise RuntimeError("ChatOllama() returned None (unexpected).")
+    return llm
 
 def get_conversation_chain(vectorstore):
     """
@@ -170,7 +191,13 @@ def get_conversation_chain(vectorstore):
     ConversationalRetrievalChain
         A chain that supports question answering with memory of past chats.
     """
+    if vectorstore is None:
+        raise ValueError("Empty vectorstore: upload PDFs with extractable text.")
+
     llm = build_local_llm()
+    if llm is None:
+        raise RuntimeError("LLM not created; check Ollama connectivity and imports.")
+
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
     return ConversationalRetrievalChain.from_llm(

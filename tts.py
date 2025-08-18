@@ -3,7 +3,7 @@ import torch
 import soundfile as sf
 from transformers import AutoTokenizer
 from parler_tts import ParlerTTSForConditionalGeneration
-
+from typing import Optional
 # Use Hugging Face Parler-TTS tiny model 
 _MODEL_ID = "parler-tts/parler-tts-tiny-v1"
 
@@ -44,7 +44,7 @@ def _ensure_loaded():
         _tokenizer = AutoTokenizer.from_pretrained(_MODEL_ID)
 
 
-def tts_to_wav_bytes(text: str, description: str | None = None) -> bytes:
+def tts_to_wav_bytes(text: str, description: Optional[str] = None) -> bytes:
     """
     Generate speech audio (WAV) from text using Parler-TTS.
 

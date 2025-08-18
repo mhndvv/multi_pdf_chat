@@ -4,12 +4,14 @@ version = "0.1.0"
 description = "Streamlit app: chat with multiple PDFs using Ollama + TTS"
 readme = "README.md"
 requires-python = ">=3.9"
+
 dependencies = [
   "streamlit",
   "python-dotenv",
   "PyPDF2",
   "langchain>=0.2",
   "langchain-community>=0.2",
+  "langchain-ollama>=0.1.0",
   "sentence-transformers",
   "faiss-cpu",
   "numpy",
@@ -18,14 +20,15 @@ dependencies = [
   "accelerate",
   "huggingface-hub",
   "sentencepiece",
-  "soundfile>=0.12",  # fixes your ModuleNotFoundError
-  "parler-tts @ git+https://github.com/huggingface/parler-tts.git",
+  "soundfile>=0.12",
+  "blinker>=1.7",
+  "parler-tts @ git+https://github.com/huggingface/parler-tts.git"
 ]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
-# prevent setuptools from trying to package your folders (media/, output/, etc.)
 [tool.setuptools]
 packages = []
+"langchain-ollama>=0.1.0",
